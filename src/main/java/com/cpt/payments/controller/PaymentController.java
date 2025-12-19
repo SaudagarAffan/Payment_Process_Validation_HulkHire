@@ -1,7 +1,6 @@
 package com.cpt.payments.controller;
 
 import org.modelmapper.ModelMapper;
-import org.springframework.core.log.LogMessage;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PathVariable;

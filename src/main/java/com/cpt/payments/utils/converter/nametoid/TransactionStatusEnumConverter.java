@@ -4,9 +4,16 @@ import org.modelmapper.AbstractConverter;
 
 import com.cpt.payments.constant.TransactionStatusEnum;
 
-public class TransactionStatusEnumConverter extends AbstractConverter<String, Integer> {
+public class TransactionStatusEnumConverter
+        extends AbstractConverter<String, Integer> {
+
     @Override
     protected Integer convert(String source) {
-        return TransactionStatusEnum.getEnumByName(source).getId();
+
+        if (source == null || source.isBlank()) {
+            return null;
+        }
+
+        return TransactionStatusEnum.fromName(source).getId();
     }
 }
