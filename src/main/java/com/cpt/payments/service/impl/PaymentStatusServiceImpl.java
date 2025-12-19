@@ -20,69 +20,90 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PaymentStatusServiceImpl implements PaymentStatusService {
 
-	private TransactionStatusFactory statusFactory;
+    private final TransactionStatusFactory statusFactory;
 
-	public PaymentStatusServiceImpl(TransactionStatusFactory statusFactory) {
-		this.statusFactory = statusFactory;
-	}
+    public PaymentStatusServiceImpl(TransactionStatusFactory statusFactory) {
+        this.statusFactory = statusFactory;
+    }
 
-	@Override
-	public TransactionResDTO createPayment(TransactionDTO transactionDTO) {
-		log.info("At service received transaction object for creating payment||"
-				+ "transaction:{}", transactionDTO);
-		
-		if(false) {//TODO
-			log.error("Error occurred while initiating payment||transactionDTO:{}", transactionDTO);
-			
-			throw new ProcessingException(
-					ErrorCodeEnum.TEMP_ERROR.getErrorCode(), 
-					ErrorCodeEnum.TEMP_ERROR.getErrorMessage(), 
-					HttpStatus.BAD_REQUEST);
-		}
-		
-		//Unique transaction reference generated for each transaction
-		transactionDTO.setTxnReference(UUID.randomUUID().toString());
-		
-		TransactionStatusHandler statusHandler = statusFactory.getStatusHandler(
-				TransactionStatusEnum.CREATED);
-		boolean isTxnSaved = statusHandler.processStatus(transactionDTO);
+    @Override
+    public TransactionResDTO createPayment(TransactionDTO transactionDTO) {
 
-		if(!isTxnSaved) {
-			log.error("Transaction not saved in DB||transaction:{}", transactionDTO);
-			//TODO throw exception 
-		}
-		
-		TransactionResDTO txnResDTO = new TransactionResDTO();
-		txnResDTO.setTxnReference(transactionDTO.getTxnReference()); 
-		txnResDTO.setTxnStatus(transactionDTO.getTxnStatus());
-		
-		log.info("Transaction created successfully||txnResDTO:{}", txnResDTO);
-		return txnResDTO;
-	}
+        log.info("At service received transaction object for creating payment || transaction:{}",
+                transactionDTO);
 
-	@Override
-	public TransactionResDTO updatePaymentStatus(TransactionDTO transactionDTO) {
-		log.info("At service received transaction object for updating payment status|| "
-				+ "transaction:{}", transactionDTO);
-		
-		TransactionStatusHandler statusHandler = statusFactory.getStatusHandler(
-				TransactionStatusEnum.getEnumByName(transactionDTO.getTxnStatus()));
-				
-		boolean isTxnUpdated = statusHandler.processStatus(transactionDTO);
+        // TODO: real validations
+        if (false) {
+            log.error("Error occurred while initiating payment || transactionDTO:{}",
+                    transactionDTO);
 
-		if(!isTxnUpdated) {
-			log.error("Transaction not saved in DB||transaction:{}", transactionDTO);
-			//TODO throw custom exception 
-			
-			throw new RuntimeException("Transaction not updated");
-		}
-		
-		TransactionResDTO txnResDTO = new TransactionResDTO();
-		txnResDTO.setTxnReference(transactionDTO.getTxnReference());
-		txnResDTO.setTxnStatus(transactionDTO.getTxnStatus());
-		
-		log.info("Transaction created successfully||txnResDTO:{}", txnResDTO);
-		return txnResDTO;
-	}
+            throw new ProcessingException(
+                    ErrorCodeEnum.TEMP_ERROR.getErrorCode(),
+                    ErrorCodeEnum.TEMP_ERROR.getErrorMessage(),
+                    HttpStatus.BAD_REQUEST);
+        }
 
+        // ✅ Generate unique transaction reference
+        transactionDTO.setTxnReference(UUID.randomUUID().toString());
+
+        // ✅ Set CREATED status
+        TransactionStatusEnum statusEnum = TransactionStatusEnum.CREATED;
+        transactionDTO.setTxnStatusId(statusEnum.getId());
+
+        // ✅ Get handler using ENUM
+        TransactionStatusHandler statusHandler =
+                statusFactory.getStatusHandler(statusEnum);
+
+        boolean isTxnSaved = statusHandler.processStatus(transactionDTO);
+
+        if (!isTxnSaved) {
+            log.error("Transaction not saved in DB || transaction:{}",
+                    transactionDTO);
+            throw new RuntimeException("Transaction creation failed");
+        }
+
+        TransactionResDTO txnResDTO = new TransactionResDTO();
+        txnResDTO.setTxnReference(transactionDTO.getTxnReference());
+        txnResDTO.setTxnStatus(statusEnum.getName());
+
+        log.info("Transaction created successfully || txnResDTO:{}",
+                txnResDTO);
+
+        return txnResDTO;
+    }
+
+    @Override
+    public TransactionResDTO updatePaymentStatus(TransactionDTO transactionDTO) {
+
+        log.info("At service received transaction object for updating payment status || transaction:{}",
+                transactionDTO);
+
+        if (transactionDTO.getTxnStatusId() == null) {
+            throw new RuntimeException("txnStatusId is required to update transaction");
+        }
+
+        // ✅ Correct ENUM resolution
+        TransactionStatusEnum statusEnum =
+                TransactionStatusEnum.fromId(transactionDTO.getTxnStatusId());
+
+        TransactionStatusHandler statusHandler =
+                statusFactory.getStatusHandler(statusEnum);
+
+        boolean isTxnUpdated = statusHandler.processStatus(transactionDTO);
+
+        if (!isTxnUpdated) {
+            log.error("Transaction not updated in DB || transaction:{}",
+                    transactionDTO);
+            throw new RuntimeException("Transaction update failed");
+        }
+
+        TransactionResDTO txnResDTO = new TransactionResDTO();
+        txnResDTO.setTxnReference(transactionDTO.getTxnReference());
+        txnResDTO.setTxnStatus(statusEnum.getName());
+
+        log.info("Transaction updated successfully || txnResDTO:{}",
+                txnResDTO);
+
+        return txnResDTO;
+    }
 }

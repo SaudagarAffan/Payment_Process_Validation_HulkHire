@@ -15,11 +15,30 @@ public class TransactionDTO {
     private double amount;
     private String currency;
 
-    // This field was missing – all the code is looking for txnStatus, not txnStatusId
-    private String txnStatus;           // ADD THIS LINE
+    // The DTO stores status as id (txnStatusId) but other code expects txnStatus
+    private Integer txnStatusId;
 
-    private int txnStatusId;            // you can keep this too if you still need the ID
+    public Integer getTxnStatusId() {
+        return txnStatusId;
+    }
 
+    // Backwards-compatible accessor expected by status handlers
+    public String getTxnStatus() {
+        if (this.txnStatusId == null) return null;
+        return com.cpt.payments.constant.TransactionStatusEnum.fromId(this.txnStatusId).name();
+    }
+
+    // Backwards-compatible mutator expected by status handlers
+    public void setTxnStatus(String txnStatus) {
+        if (txnStatus == null) {
+            this.txnStatusId = null;
+            return;
+        }
+        this.txnStatusId = com.cpt.payments.constant.TransactionStatusEnum.fromName(txnStatus).getId();
+    }
+
+    
+    
     private String merchantTransactionReference;
     private String txnReference;
 

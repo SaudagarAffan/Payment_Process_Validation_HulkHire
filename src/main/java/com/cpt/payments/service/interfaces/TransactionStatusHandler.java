@@ -3,8 +3,6 @@ package com.cpt.payments.service.interfaces;
 import com.cpt.payments.constant.TransactionStatusEnum;
 import com.cpt.payments.dto.TransactionDTO;
 
-import lombok.extern.slf4j.Slf4j;
-
 public interface TransactionStatusHandler {
 	
 	public boolean processStatus(TransactionDTO transactionDTO);

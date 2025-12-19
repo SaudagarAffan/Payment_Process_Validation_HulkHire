@@ -20,89 +20,107 @@ import lombok.extern.slf4j.Slf4j;
 @Repository
 @Slf4j
 public class TransactionDaoImpl implements TransactionDao {
-
-	private ModelMapper modelMapper;
-
-	private NamedParameterJdbcTemplate namedParameterJdbcTemplate;
-
-	public TransactionDaoImpl(ModelMapper modelMapper, 
-			NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
-		this.modelMapper = modelMapper;
-		this.namedParameterJdbcTemplate = namedParameterJdbcTemplate;
-	}
-
-	@Override
-	public boolean createTransaction(TransactionDTO transactionDTO) {
-		log.info("At DAO received transaction object for creating payment|| "
-				+ "transaction:{}", transactionDTO);
-
-		TransactionEntity txnEntity = modelMapper.map(transactionDTO, TransactionEntity.class);
-
-		log.debug("Converted to TransactionEntity:{}", txnEntity);
-
-		String sql = "INSERT INTO `Transaction` ("
-				+ "userId, paymentMethodId, providerId, paymentTypeId, "
-				+ "amount, currency, txnStatusId, "
-				+ "merchantTransactionReference, txnReference, "
-				+ "providerCode, providerMessage, providerReference, retryCount"
-				+ ") VALUES ("
-				+ ":userId, :paymentMethodId, :providerId, :paymentTypeId, "
-				+ ":amount, :currency, :txnStatusId, "
-				+ ":merchantTransactionReference, :txnReference, "
-				+ ":providerCode, :providerMessage, :providerReference, :retryCount"
-				+ ")";
-
-		SqlParameterSource params = new BeanPropertySqlParameterSource(txnEntity);
-		KeyHolder keyHolder = new GeneratedKeyHolder();
-		int updatedRowCount = namedParameterJdbcTemplate.update(sql, params, keyHolder);
-		
-		int txnId = keyHolder.getKey().intValue();
-		transactionDTO.setId(txnId);
-		
-		log.info("Transaction created in DB txnReference:{}|updatedRowCount:{}", 
-				txnEntity.getTxnReference(), updatedRowCount);
-
-		return updatedRowCount == 1;
-	}
-
-	@Override
-	public TransactionDTO getTransaction(String txnReference) {
-		String sql = "SELECT * FROM `Transaction` WHERE txnReference = :txnReference";
-
-		MapSqlParameterSource parameters = new MapSqlParameterSource();
-		parameters.addValue("txnReference", txnReference);
-
-		// Using BeanPropertyRowMapper for direct mapping to TransactionEntity
-		TransactionEntity val =  namedParameterJdbcTemplate.queryForObject(
-				sql, 
-				parameters, 
-				new BeanPropertyRowMapper<>(TransactionEntity.class)
-				);
-
-		TransactionDTO txnDTO = modelMapper.map(val, TransactionDTO.class);
-
-		log.info("Transaction fetched from DB txnReference:{}|txnDTO:{}", txnReference, txnDTO);
-		return txnDTO;
-	}
 	
 	
-	@Override
-	public boolean updateTransaction(TransactionDTO transactionDTO) {
-		String sql = "UPDATE `Transaction` SET txnStatusId = :txnStatusId WHERE txnReference = :txnReference";
-
-	    MapSqlParameterSource parameters = new MapSqlParameterSource();
-	    parameters.addValue("txnReference", transactionDTO.getTxnReference());
-	    
-	    int txnStatusId = TransactionStatusEnum.getEnumByName(transactionDTO.getTxnStatus()).getId();
-	    
-	    parameters.addValue("txnStatusId", txnStatusId);
-
-	    int rowsAffected = namedParameterJdbcTemplate.update(sql, parameters);
-
-	    log.info("Updated txnStatusId for txnReference:{} to txnStatusId:{} | Rows affected: {}", 
-	    		transactionDTO.getTxnReference(), txnStatusId, rowsAffected);
-		
-		return rowsAffected == 1;
+	private Integer txnStatusId;
+	public Integer getTxnStatusId() {
+	    return txnStatusId;
 	}
 
+
+    private final ModelMapper modelMapper;
+    private final NamedParameterJdbcTemplate namedParameterJdbcTemplate;
+
+    public TransactionDaoImpl(ModelMapper modelMapper,
+                              NamedParameterJdbcTemplate namedParameterJdbcTemplate) {
+        this.modelMapper = modelMapper;
+        this.namedParameterJdbcTemplate = namedParameterJdbcTemplate;
+    }
+
+    @Override
+    public boolean createTransaction(TransactionDTO transactionDTO) {
+
+        log.info("DAO | Creating transaction | request: {}", transactionDTO);
+
+        TransactionEntity txnEntity =
+                modelMapper.map(transactionDTO, TransactionEntity.class);
+
+        String sql = """
+            INSERT INTO `Transaction` (
+                userId, paymentMethodId, providerId, paymentTypeId,
+                amount, currency, txnStatusId,
+                merchantTransactionReference, txnReference,
+                providerCode, providerMessage, providerReference, retryCount
+            ) VALUES (
+                :userId, :paymentMethodId, :providerId, :paymentTypeId,
+                :amount, :currency, :txnStatusId,
+                :merchantTransactionReference, :txnReference,
+                :providerCode, :providerMessage, :providerReference, :retryCount
+            )
+        """;
+
+        SqlParameterSource params =
+                new BeanPropertySqlParameterSource(txnEntity);
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+
+        int rows = namedParameterJdbcTemplate.update(sql, params, keyHolder);
+
+        if (rows == 1 && keyHolder.getKey() != null) {
+            transactionDTO.setId(keyHolder.getKey().intValue());
+        }
+
+        log.info("DAO | Transaction created | txnId:{} | txnReference:{}",
+                transactionDTO.getId(), txnEntity.getTxnReference());
+
+        return rows == 1;
+    }
+
+    @Override
+    public TransactionDTO getTransaction(String txnReference) {
+
+        String sql = "SELECT * FROM `Transaction` WHERE txnReference = :txnReference";
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("txnReference", txnReference);
+
+        TransactionEntity entity = namedParameterJdbcTemplate.queryForObject(
+                sql,
+                params,
+                new BeanPropertyRowMapper<>(TransactionEntity.class)
+        );
+
+        TransactionDTO dto = modelMapper.map(entity, TransactionDTO.class);
+
+        log.info("DAO | Transaction fetched | txnReference:{} | statusId:{}",
+                txnReference, dto.getTxnStatusId());
+
+        return dto;
+    }
+
+    @Override
+    public boolean updateTransaction(TransactionDTO transactionDTO) {
+
+        if (transactionDTO.getTxnStatusId() == null) {
+            throw new IllegalArgumentException("txnStatusId cannot be null");
+        }
+
+        String sql = """
+            UPDATE `Transaction`
+            SET txnStatusId = :txnStatusId
+            WHERE txnReference = :txnReference
+        """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("txnReference", transactionDTO.getTxnReference())
+                .addValue("txnStatusId", transactionDTO.getTxnStatusId());
+
+        int rows = namedParameterJdbcTemplate.update(sql, params);
+
+        log.info("DAO | Transaction updated | txnReference:{} | newStatusId:{}",
+                transactionDTO.getTxnReference(),
+                transactionDTO.getTxnStatusId());
+
+        return rows == 1;
+    }
 }

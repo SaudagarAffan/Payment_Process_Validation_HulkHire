@@ -15,38 +15,46 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class PendingStatusHandler implements TransactionStatusHandler {
 
-	private TransactionDao transactionDao;
-	private TransactionLogDao transactionLogDao;
-	
-	public PendingStatusHandler(TransactionDao transactionDao, 
-			TransactionLogDao transactionLogDao) {
-		this.transactionDao = transactionDao;
-		this.transactionLogDao = transactionLogDao;
-	}
-	
-	@Override
-	public boolean processStatus(TransactionDTO transactionDTO) {
+    private final TransactionDao transactionDao;
+    private final TransactionLogDao transactionLogDao;
+
+    public PendingStatusHandler(TransactionDao transactionDao,
+                                TransactionLogDao transactionLogDao) {
+        this.transactionDao = transactionDao;
+        this.transactionLogDao = transactionLogDao;
+    }
+
+    @Override
+    public boolean processStatus(TransactionDTO transactionDTO) {
+
         log.info("Processing status for PENDING||transaction:{}", transactionDTO);
-        TransactionDTO txnBeforeUpdate = transactionDao.getTransaction(transactionDTO.getTxnReference());
-        
+
+        TransactionDTO txnBeforeUpdate =
+                transactionDao.getTransaction(transactionDTO.getTxnReference());
+
         if (!canUpdateTransaction(
-				txnBeforeUpdate.getTxnStatus(), transactionDTO.getTxnStatus())) {
-			log.error("Cannot Update transaction||fromStatus:{}||toStatus:{}", 
-					txnBeforeUpdate.getTxnStatus(), transactionDTO.getTxnStatus());
-			return false;
-		}
-        
-		boolean isTxnUpdated = transactionDao.updateTransaction(transactionDTO);
+                txnBeforeUpdate.getTxnStatus(), transactionDTO.getTxnStatus())) {
+            return false;
+        }
 
-		log.info("Transaction updated successfully||isTxnUpdated:{}", isTxnUpdated);
-		
-		TransactionLog transactionLog = TransactionLog.builder().transactionId(txnBeforeUpdate.getId())
-				.txnFromStatus(txnBeforeUpdate.getTxnStatus())
-				.txnToStatus(transactionDTO.getTxnStatus())
-				.build();
-		transactionLogDao.createTransactionLog(transactionLog);
-		
-		return isTxnUpdated;
-	}
+        boolean isUpdated = transactionDao.updateTransaction(transactionDTO);
 
+        TransactionLog transactionLog = TransactionLog.builder()
+                .transactionId(txnBeforeUpdate.getId())
+                .txnFromStatus(
+                        TransactionStatusEnum
+                                .getEnumByName(txnBeforeUpdate.getTxnStatus())
+                                .getId()
+                )
+                .txnToStatus(
+                        TransactionStatusEnum
+                                .getEnumByName(transactionDTO.getTxnStatus())
+                                .getId()
+                )
+                .build();
+
+        transactionLogDao.createTransactionLog(transactionLog);
+
+        return isUpdated;
+    }
 }
